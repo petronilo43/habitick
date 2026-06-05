@@ -3,25 +3,21 @@ import { Routes, Route, useNavigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import { supabase } from './supabaseClient'; 
 
+// IMPORTAÇÃO DA SUA IMAGEM LOCAL (WORKER.PNG)
+import workerImage from './assets/worker.jpg';
+
 export default function App() {
   const navigate = useNavigate();
   
   // =========================================================================
-  // 1. SESSÃO PERSISTENTE (Mantém o usuário logado)
+  // 1. SESSÃO PERSISTENTE E ESTADOS DO MENU (Padrão de Segurança)
   // =========================================================================
   const [session, setSession] = useState(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Verifica a sessão assim que o site abre
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    // Fica "escutando" se o usuário fez login ou logout
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
     return () => subscription.unsubscribe();
   }, []);
 
@@ -32,7 +28,7 @@ export default function App() {
   };
 
   // =========================================================================
-  // 2. SISTEMA DE NOTIFICAÇÕES PROFISSIONAIS
+  // 2. SISTEMA DE NOTIFICAÇÕES TOAST (Nível Profissional)
   // =========================================================================
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
@@ -42,7 +38,7 @@ export default function App() {
   };
 
   // =========================================================================
-  // 3. INTRODUÇÃO INICIAL (1x por sessão)
+  // 3. INTRODUÇÃO CINEMATOGRÁFICA (Estilo Netflix)
   // =========================================================================
   const [showIntro, setShowIntro] = useState(() => !sessionStorage.getItem('habitickIntroSeen'));
   const [introStep, setIntroStep] = useState(0);
@@ -57,7 +53,7 @@ export default function App() {
   }, [showIntro]);
 
   // =========================================================================
-  // 4. MINI-CORTINA DE TRANSIÇÃO
+  // 4. MINI-CORTINA DE TRANSIÇÃO (Oculta o carregamento de dados)
   // =========================================================================
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionMessage, setTransitionMessage] = useState('Habi tick.ie');
@@ -75,7 +71,7 @@ export default function App() {
   };
 
   // =========================================================================
-  // 5. ESTADOS E DADOS (CATÁLOGO DE SERVIÇOS)
+  // 5. ENGENHARIA DO ARQUIVAMENTO DE SERVIÇOS IRLANDESES
   // =========================================================================
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -88,46 +84,18 @@ export default function App() {
   const [otherText, setOtherText] = useState('');
 
   const services = [
-    { 
-      id: 1, icon: '🧹', name: 'Home Cleaning', desc: 'Deep or regular cleaning for houses and apartments nationwide.', priceLabel: 'From €14.50/hr',
-      customField: { label: 'Property Size', options: ['1 Bedroom / Studio', '2-3 Bedrooms', '4+ Bedrooms', 'Other'] }
-    },
-    { 
-      id: 2, icon: '🏡', name: 'Gardening & Lawn', desc: 'Lawn mowing, hedge trimming, weeding, and general garden cleanups.', priceLabel: 'From €29.00 fixed',
-      customField: { label: 'Garden Condition', options: ['Regular Maintenance', 'Overgrown / Needs deep clean', 'Green Waste Removal', 'Other'] }
-    },
-    { 
-      id: 3, icon: '🚗', name: 'Eco Car Valeting', desc: 'Premium waterless exterior car wash and interior vacuuming right at your driveway.', priceLabel: 'From €35.00 fixed',
-      customField: { label: 'Vehicle Size', options: ['Hatchback / Small', 'Saloon / Sedan', 'SUV / 7-Seater / Van', 'Other'] }
-    },
-    { 
-      id: 4, icon: '🐕', name: 'Dog Walking', desc: 'Reliable, fully insured local walkers to exercise your dog in your neighborhood.', priceLabel: 'From €15.00/hr',
-      customField: { label: 'Walk Duration', options: ['30 Minutes', '1 Hour', '2 Hours', 'Other'] }
-    },
-    { 
-      id: 5, icon: '💆‍♂️', name: 'Massage Therapy', desc: 'Leisure, therapeutic, and relaxation massages conducted by certified professionals at your home.', priceLabel: 'From €55.00 fixed',
-      customField: { label: 'Massage Type', options: ['Relaxation (50 min)', 'Deep Tissue (50 min)', 'Sports Recovery', 'Other'] }
-    },
-    { 
-      id: 6, icon: '📦', name: 'Item Transport', desc: 'Need to move boxes, furniture, or fetch an item? Quick courier and local transport on demand.', priceLabel: 'From €20.00 fixed',
-      customField: { label: 'Item Size', options: ['Small Bags/Boxes', 'Medium Furniture (e.g. Chair)', 'Large Items (e.g. Sofa, Bed)', 'Other'] }
-    },
-    { 
-      id: 7, icon: '🎨', name: 'House Painting', desc: 'Professional interior wall painting, door skirting, and exterior detailing.', priceLabel: 'From €18.50/hr',
-      customField: { label: 'Scope of Work', options: ['1 Room or Feature Wall', '2-3 Rooms', 'Whole House Interior', 'Exterior / Fences', 'Other'] }
-    },
-    { 
-      id: 8, icon: '🔨', name: 'Handyman / Repairs', desc: 'Small home construction works, furniture assembly, TV wall mounting, and general property maintenance.', priceLabel: 'From €25.00/hr',
-      customField: { label: 'Required Task', options: ['Furniture Assembly (IKEA etc)', 'TV Wall Mounting', 'Plumbing (Leaking Taps, etc)', 'Hanging Pictures / Shelves', 'Other'] }
-    },
-    { 
-      id: 9, icon: '🔧', name: 'Mobile Mechanic', desc: 'On-demand car diagnostics, battery jumps, roadside tyre changes, and minor mechanical fixes.', priceLabel: 'From €40.00 fixed',
-      customField: { label: 'Vehicle Issue', options: ['Dead Battery Jump Start', 'Flat Tyre Change', 'Computer Diagnostics Scan', 'Brakes Inspection', 'Other'] }
-    }
+    { id: 1, icon: '🧹', name: 'Home Cleaning', desc: 'Deep or regular cleaning for houses and apartments nationwide.', priceLabel: 'From €14.50/hr', customField: { label: 'Property Size', options: ['1 Bedroom / Studio', '2-3 Bedrooms', '4+ Bedrooms', 'Other'] } },
+    { id: 2, icon: '🏡', name: 'Gardening & Lawn', desc: 'Lawn mowing, hedge trimming, weeding, and general garden cleanups.', priceLabel: 'From €29.00 fixed', customField: { label: 'Garden Condition', options: ['Regular Maintenance', 'Overgrown / Needs deep clean', 'Green Waste Removal', 'Other'] } },
+    { id: 3, icon: '🚗', name: 'Eco Car Valeting', desc: 'Premium waterless exterior car wash and interior vacuuming right at your driveway.', priceLabel: 'From €35.00 fixed', customField: { label: 'Vehicle Size', options: ['Hatchback / Small', 'Saloon / Sedan', 'SUV / 7-Seater / Van', 'Other'] } },
+    { id: 4, icon: '🐕', name: 'Dog Walking', desc: 'Reliable, fully insured local walkers to exercise your dog in your neighborhood.', priceLabel: 'From €15.00/hr', customField: { label: 'Walk Duration', options: ['30 Minutes', '1 Hour', '2 Hours', 'Other'] } },
+    { id: 5, icon: '💆‍♂️', name: 'Massage Therapy', desc: 'Leisure, therapeutic, and relaxation massages conducted by certified professionals at your home.', priceLabel: 'From €55.00 fixed', customField: { label: 'Massage Type', options: ['Relaxation (50 min)', 'Deep Tissue (50 min)', 'Sports Recovery', 'Other'] } },
+    { id: 6, icon: '📦', name: 'Item Transport', desc: 'Need to move boxes, furniture, or fetch an item? Quick courier and local transport on demand.', priceLabel: 'From €20.00 fixed', customField: { label: 'Item Size', options: ['Small Bags/Boxes', 'Medium Furniture (e.g. Chair)', 'Large Items (e.g. Sofa, Bed)', 'Other'] } },
+    { id: 7, icon: '🎨', name: 'House Painting', desc: 'Professional interior wall painting, door skirting, and exterior detailing.', priceLabel: 'From €18.50/hr', customField: { label: 'Scope of Work', options: ['1 Room or Feature Wall', '2-3 Rooms', 'Whole House Interior', 'Exterior / Fences', 'Other'] } },
+    { id: 8, icon: '🔨', name: 'Handyman / Repairs', desc: 'Small home construction works, furniture assembly, TV wall mounting, and general property maintenance.', priceLabel: 'From €25.00/hr', customField: { label: 'Required Task', options: ['Furniture Assembly (IKEA etc)', 'TV Wall Mounting', 'Plumbing (Leaking Taps, etc)', 'Hanging Pictures / Shelves', 'Other'] } },
+    { id: 9, icon: '🔧', name: 'Mobile Mechanic', desc: 'On-demand car diagnostics, battery jumps, roadside tyre changes, and minor mechanical fixes.', priceLabel: 'From €40.00 fixed', customField: { label: 'Vehicle Issue', options: ['Dead Battery Jump Start', 'Flat Tyre Change', 'Computer Diagnostics Scan', 'Brakes Inspection', 'Other'] } }
   ];
 
   const startBooking = (serviceItem) => {
-    // Se o usuário não estiver logado, obriga ele a criar conta antes de agendar!
     if (!session) {
       setPreviewService(null);
       setAuthMode('register');
@@ -136,7 +104,6 @@ export default function App() {
       showToast("Please create an account to book a service.", "success");
       return;
     }
-
     setSelectedService(serviceItem);
     setPreviewService(null);
     setExtraOption(''); 
@@ -145,7 +112,7 @@ export default function App() {
   };
 
   // =========================================================================
-  // 6. AUTENTICAÇÃO
+  // 6. PROCESSAMENTO DE CADASTRO / LOGIN (Supabase Auth)
   // =========================================================================
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -154,9 +121,8 @@ export default function App() {
     const password = formData.get('password');
 
     if (authMode === 'register') {
-      if (email !== formData.get('confirmEmail')) { showToast("Emails do not match. Please check.", "error"); return; }
-      if (password !== formData.get('confirmPassword')) { showToast("Passwords do not match. Please check.", "error"); return; }
-      
+      if (email !== formData.get('confirmEmail')) { showToast("Emails do not match.", "error"); return; }
+      if (password !== formData.get('confirmPassword')) { showToast("Passwords do not match.", "error"); return; }
       setIsAuthOpen(false); 
       runActionWithTransition(async () => {
         const { error } = await supabase.auth.signUp({ email, password, options: { data: { role: userRole } } });
@@ -170,7 +136,7 @@ export default function App() {
       setIsAuthOpen(false);
       runActionWithTransition(async () => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) { showToast("Invalid login credentials. Please try again.", "error"); setIsAuthOpen(true); return false; }
+        if (error) { showToast("Invalid login credentials.", "error"); setIsAuthOpen(true); return false; }
         const role = data.user?.user_metadata?.role || 'client';
         navigate('/dashboard', { state: { role: role } });
         return true;
@@ -179,7 +145,7 @@ export default function App() {
   };
 
   return (
-    <>
+    <div className="bg-slate-50 min-h-screen font-sans text-slate-800 relative scroll-smooth">
       {/* TOAST SYSTEM */}
       {toast.show && (
         <div className={`fixed top-8 left-1/2 -translate-x-1/2 z-[10000] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-10 duration-300 font-medium ${toast.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}`}>
@@ -196,6 +162,8 @@ export default function App() {
         </div>
       </div>
 
+      {isMenuOpen && <div onClick={() => setIsMenuOpen(false)} className="fixed inset-0 z-30"></div>}
+
       {/* INTRODUÇÃO INICIAL */}
       {showIntro && (
         <div className={`fixed inset-0 z-[9999] bg-slate-900 flex flex-col items-center justify-center transition-transform duration-700 ease-in-out ${introStep === 3 ? '-translate-y-full' : 'translate-y-0'}`}>
@@ -206,52 +174,113 @@ export default function App() {
 
       <Routes>
         <Route path="/" element={
-          <div className="bg-slate-50 min-h-screen font-sans text-slate-800 flex flex-col justify-between">
+          <div className="flex flex-col justify-between min-h-screen">
             <div className="flex-grow">
               
-              {/* NAVBAR DINÂMICA (Muda se estiver logado) */}
-              <nav className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center bg-white shadow-sm rounded-b-xl">
-                <div className="text-2xl font-bold text-slate-900 tracking-tight cursor-pointer">Habi<span className="text-emerald-600">tick.ie</span></div>
+              {/* NAVBAR PREMIUM */}
+              <nav className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center bg-transparent relative z-40 mt-2">
+                <div className="text-2xl font-black text-slate-900 tracking-tight cursor-pointer">Habi<span className="text-emerald-600">tick.ie</span></div>
                 <div className="flex gap-3 sm:gap-5 items-center">
-                  
-                  {/* LÓGICA DE EXIBIÇÃO: Se logado, mostra Dashboard. Se não, mostra Login/Register */}
                   {session ? (
-                    <>
-                      <button onClick={() => navigate('/dashboard', { state: { role: session.user?.user_metadata?.role || 'client' } })} className="text-sm font-bold text-emerald-600 hover:text-emerald-800 transition active:scale-95 cursor-pointer flex items-center gap-2"><span>📊</span> Dashboard</button>
-                      <span className="text-slate-200 hidden sm:inline">|</span>
-                      <button onClick={handleLogout} className="bg-slate-100 text-slate-600 text-sm px-4 py-2 rounded-lg font-bold hover:bg-slate-200 transition shadow-sm active:scale-95 cursor-pointer">Log Out</button>
-                    </>
+                    <div className="flex items-center gap-4 relative">
+                      <button onClick={() => navigate('/dashboard', { state: { role: session.user?.user_metadata?.role || 'client' } })} className="text-sm font-bold text-emerald-600 hover:text-emerald-800 transition active:scale-95 cursor-pointer hidden sm:flex items-center gap-2"><span>📊</span> Go to Dashboard</button>
+                      <div onClick={() => setIsMenuOpen(!isMenuOpen)} className="w-10 h-10 bg-slate-900 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:bg-slate-800 transition active:scale-95 shadow-md">
+                        {session.user?.email ? session.user.email.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                      {isMenuOpen && (
+                        <div className="absolute top-14 right-0 w-56 bg-white border border-slate-200 shadow-xl rounded-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                          <div className="px-4 py-3 border-b border-slate-100 mb-1 bg-slate-50 rounded-t-xl mt-[-8px]"><p className="text-sm font-bold text-slate-900 truncate">{session.user?.email}</p><p className="text-xs text-slate-500 capitalize">{session.user?.user_metadata?.role || 'Client'} Account</p></div>
+                          <button onClick={() => { setIsMenuOpen(false); navigate('/dashboard'); }} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition flex items-center gap-2 cursor-pointer"><span>👤</span> Profile Overview</button>
+                          <button onClick={() => { setIsMenuOpen(false); navigate('/dashboard'); }} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition flex items-center gap-2 cursor-pointer"><span>💳</span> Wallet & Payouts</button>
+                          <button onClick={() => { setIsMenuOpen(false); navigate('/dashboard'); }} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition flex items-center gap-2 cursor-pointer"><span>🎧</span> Help & Support</button>
+                          <div className="border-t border-slate-100 mt-1 pt-1"><button onClick={() => { setIsMenuOpen(false); handleLogout(); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition flex items-center gap-2 cursor-pointer"><span>🚪</span> Log Out</button></div>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <>
-                      <button onClick={() => {setAuthMode('pricing'); setIsAuthOpen(true);}} className="text-sm font-medium text-slate-600 hover:text-slate-900 transition active:scale-95 cursor-pointer">Become a Pro</button>
+                      <button onClick={() => {setAuthMode('pricing'); setIsAuthOpen(true);}} className="text-sm font-bold text-slate-600 hover:text-slate-900 transition active:scale-95 cursor-pointer">Become a Pro</button>
                       <span className="text-slate-200 hidden sm:inline">|</span>
-                      <button onClick={() => {setAuthMode('login'); setIsAuthOpen(true);}} className="text-sm font-medium text-slate-600 hover:text-slate-900 transition active:scale-95 cursor-pointer">Login</button>
-                      <button onClick={() => { setUserRole('client'); setAuthMode('register'); setIsAuthOpen(true); }} className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg font-medium hover:bg-slate-800 transition shadow-sm active:scale-95 cursor-pointer">Register</button>
+                      <button onClick={() => {setAuthMode('login'); setIsAuthOpen(true);}} className="text-sm font-bold text-slate-600 hover:text-slate-900 transition active:scale-95 cursor-pointer">Login</button>
+                      <button onClick={() => { setUserRole('client'); setAuthMode('register'); setIsAuthOpen(true); }} className="bg-slate-900 text-white text-sm px-5 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition shadow-lg active:scale-95 cursor-pointer">Register</button>
                     </>
                   )}
-
                 </div>
               </nav>
 
-              {/* HERO SECTION */}
-              <section className="max-w-5xl mx-auto px-6 pt-16 pb-12 text-center">
-                <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">Ireland's On-Demand Home Services</span>
-                <h1 className="mt-6 text-4xl sm:text-6xl font-extrabold text-slate-900 tracking-tight leading-none">Your home, sorted <br /><span className="text-emerald-600">at the click of a button.</span></h1>
-                <p className="mt-6 text-lg text-slate-600 max-w-2xl mx-auto">Premium home on-demand marketplace across Ireland. Trusted local professionals, fair pricing starting at minimum wage, and instant booking.</p>
+              {/* ===================================================================== */}
+              {/* ASYMMETRIC GRID GRID LAYOUT (Estilo Uber/Airbnb) com WORKER.PNG */}
+              {/* ===================================================================== */}
+              <section className="max-w-7xl mx-auto px-6 pt-12 pb-20 relative z-10 flex flex-col lg:flex-row items-center gap-12 lg:gap-8">
+                
+                {/* Lado Esquerdo: Títulos de Venda */}
+                <div className="w-full lg:w-1/2 text-left pt-8">
+                  <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider inline-block mb-6 border border-emerald-200 shadow-sm">
+                    Ireland's On-Demand Services
+                  </span>
+                  <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-slate-900 tracking-tight leading-[1.1]">
+                    Your home, sorted <br />
+                    <span className="text-emerald-600">in one click.</span>
+                  </h1>
+                  <p className="mt-6 text-lg sm:text-xl text-slate-600 max-w-lg leading-relaxed">
+                    The premium home marketplace across Ireland. Trusted local professionals, fair pricing starting at minimum wage, and instant secure booking.
+                  </p>
+                  
+                  <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                    <button 
+                      onClick={() => document.getElementById('services-grid').scrollIntoView({ behavior: 'smooth' })} 
+                      className="bg-emerald-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-emerald-500 transition active:scale-95 shadow-xl shadow-emerald-600/20 cursor-pointer text-center"
+                    >
+                      Book a Service
+                    </button>
+                    {!session && (
+                      <button 
+                        onClick={() => {setAuthMode('pricing'); setIsAuthOpen(true);}} 
+                        className="bg-white text-slate-700 px-8 py-4 rounded-xl font-bold text-lg hover:bg-slate-50 transition active:scale-95 shadow-md border border-slate-200 cursor-pointer text-center"
+                      >
+                        Work with us
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Lado Direito: Estrutura Geométrica 3D com a foto WORKER.PNG */}
+                <div className="w-full lg:w-1/2 relative mt-8 lg:mt-0 flex justify-end">
+                  {/* Bloco Geométrico de Fundo (Quadrado Verde Offset) */}
+                  <div className="absolute top-6 -right-4 lg:-right-6 w-[90%] h-full bg-emerald-500 rounded-3xl shadow-2xl transform rotate-2"></div>
+                  
+                  {/* EXIBIÇÃO DA SUA IMAGEM LOCAL SALVA EM ASSETS */}
+                  <img 
+                    src={workerImage} 
+                    alt="Habitick Trusted Professional" 
+                    className="relative z-10 w-[95%] h-[400px] sm:h-[500px] object-cover rounded-3xl shadow-xl transform -rotate-1 transition-transform hover:rotate-0 duration-300"
+                  />
+                </div>
               </section>
 
-              {/* SERVIÇOS (CATÁLOGO) */}
-              <section className="max-w-6xl mx-auto px-6 py-12">
-                <h2 className="text-2xl font-bold text-slate-900 text-center mb-8">Select a service to view details & book</h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
+              {/* ===================================================================== */}
+              {/* GRID COMPACTO E RESPONSIVO DE 9 CATEGORIAS (Estilo Airbnb/Netflix) */}
+              {/* ===================================================================== */}
+              <section id="services-grid" className="max-w-7xl mx-auto px-6 py-16 scroll-mt-10 relative z-10">
+                <h2 className="text-3xl font-extrabold text-slate-900 text-center mb-10 tracking-tight">Select a service to view details & book</h2>
+                
+                {/* CSS GRID DE ALTO PADRÃO */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {services.map((s) => (
-                    <div key={s.id} onClick={() => setPreviewService(s)} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-slate-200 transition-all duration-200 cursor-pointer flex flex-col justify-between active:scale-95">
+                    <div 
+                      key={s.id} 
+                      onClick={() => setPreviewService(s)} 
+                      className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-emerald-200 transition-all duration-200 cursor-pointer flex flex-col justify-between active:scale-95 group"
+                    >
                       <div>
-                        <div className="text-4xl mb-3">{s.icon}</div>
-                        <h3 className="text-lg font-bold text-slate-900 tracking-tight">{s.name}</h3>
+                        {/* Micro-animação de escala no ícone do card ao passar o mouse */}
+                        <div className="text-4xl mb-4 transform group-hover:scale-110 transition duration-300">{s.icon}</div>
+                        <h3 className="text-xl font-bold text-slate-900 tracking-tight">{s.name}</h3>
                         <p className="text-xs text-slate-400 mt-1 uppercase font-bold tracking-wider">{s.priceLabel}</p>
                       </div>
-                      <div className="mt-6 text-xs font-bold text-emerald-600 flex items-center gap-1">View Details <span>→</span></div>
+                      <div className="mt-6 text-sm font-bold text-emerald-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                        View Details <span>→</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -259,10 +288,10 @@ export default function App() {
             </div>
 
             {/* FOOTER */}
-            <footer className="bg-white border-t border-slate-100 mt-16">
+            <footer className="bg-white border-t border-slate-100 mt-16 relative z-10">
               <div className="max-w-7xl mx-auto px-6 py-10 md:flex md:items-center md:justify-between">
                 <div><div className="text-xl font-bold text-slate-900 tracking-tight">Habi<span className="text-emerald-600">tick.ie</span></div><p className="text-sm text-slate-500 mt-2 max-w-xs">The smartest way to book trusted home services in Ireland.</p></div>
-                <div className="flex gap-x-8 text-sm text-slate-600"><button onClick={() => {setAuthMode('pricing'); setIsAuthOpen(true);}} className="hover:text-emerald-600 transition cursor-pointer">Premium Plans</button><span className="text-slate-500">Contact: <strong>support@habitick.ie</strong></span></div>
+                <div className="flex gap-x-8 text-sm text-slate-600"><button onClick={() => {setAuthMode('pricing'); setIsAuthOpen(true);}} className="hover:text-emerald-600 transition cursor-pointer font-medium">Premium Plans</button><span className="text-slate-500">Contact: <strong>support@habitick.ie</strong></span></div>
               </div>
             </footer>
 
@@ -370,8 +399,10 @@ export default function App() {
             )}
           </div>
         } />
+        
+        {/* ROTA DO DASHBOARD */}
         <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
-    </>
+    </div>
   );
 }

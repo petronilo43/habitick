@@ -1,382 +1,243 @@
-import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { supabase } from '../supabaseClient'; // Ajuste o caminho se necessário
 
 export default function Dashboard() {
-  const location = useLocation();
   const navigate = useNavigate();
-
-  const initialRole = location.state?.role || 'client';
+  const location = useLocation();
   
-  // ESTADOS DO DASHBOARD E VISUALIZAÇÃO
-  const [isPro, setIsPro] = useState(initialRole === 'pro');
-  const [viewMode, setViewMode] = useState(initialRole === 'pro' ? 'pro' : 'client');
-  const [isNewBookingOpen, setIsNewBookingOpen] = useState(false);
-  const [activeRequests, setActiveRequests] = useState([]);
+  // =========================================================================
+  // 1. ESTADOS DE SESSÃO E PERFIL
+  // =========================================================================
+  const [user, setUser] = useState(null);
+  const [role, setRole] = useState(location.state?.role || 'client');
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('overview');
 
-  // ESTADOS DE PLANOS SEPARADOS
-  const [clientPlan, setClientPlan] = useState('free');
-  const [proPlan, setProPlan] = useState(initialRole === 'pro' ? 'pro' : 'free');
-  const [isManagingPlan, setIsManagingPlan] = useState(false);
+  // =========================================================================
+  // 2. SISTEMA DE NOTIFICAÇÕES (Consistência com a App.jsx)
+  // =========================================================================
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 4000);
+  };
 
-  // ESTADOS DO MENU DIREITO E MODAIS DE CONTEÚDO
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeModal, setActiveModal] = useState(null);
-
-  // ESTADOS DO PERFIL E SALDO
-  const [isEditingAddress, setIsEditingAddress] = useState(false);
-  const [userAddress, setUserAddress] = useState('V94 XXXX, Limerick');
-  const [userBalance, setUserBalance] = useState("0.00"); // Saldo simulado do usuário
-
-  const currentActivePlan = viewMode === 'client' ? clientPlan : proPlan;
-
-  const handlePostService = (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const budgetValue = parseFloat(formData.get('budget'));
-
-    if (budgetValue < 14.20) {
-      alert("❌ Error: Minimum allowed offer is €14.20 (Irish Minimum Wage).");
-      return;
-    }
-    
-    const newRequest = {
-      id: Date.now(),
-      service: formData.get('serviceType'),
-      location: formData.get('location'),
-      budget: budgetValue.toFixed(2),
-      status: 'Searching for Pro...',
-      date: new Date().toLocaleDateString()
+  // =========================================================================
+  // 3. VERIFICAÇÃO DE SEGURANÇA (Redireciona se não estiver logado)
+  // =========================================================================
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/');
+        return;
+      }
+      
+      setUser(session.user);
+      // Puxa a role do banco de dados (caso não tenha vindo pela navegação)
+      if (session.user.user_metadata?.role) {
+        setRole(session.user.user_metadata.role);
+      }
+      setLoading(false);
     };
+    
+    checkUser();
+  }, [navigate]);
 
-    setActiveRequests([newRequest, ...activeRequests]);
-    setIsNewBookingOpen(false);
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
   };
 
-  const upgradePlan = () => {
-    alert("Redirecting to Stripe... Secure Payment for €7 Premium Plan.");
-    if (viewMode === 'client') setClientPlan('pro');
-    else {
-      setProPlan('pro');
-      setIsPro(true);
-    }
-    setIsManagingPlan(false);
-  };
-
-  const downgradePlan = () => {
-    if (viewMode === 'client') setClientPlan('free');
-    else setProPlan('free');
-  };
-
-  const handleMenuClick = (modalType) => {
-    setIsMenuOpen(false);
-    if (modalType === 'logout') {
-      navigate('/');
-    } else {
-      setActiveModal(modalType);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-emerald-500 font-bold text-xl animate-pulse">Loading Habitick...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-slate-50 min-h-screen font-sans text-slate-800 relative">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
       
-      {/* NAVBAR */}
-      <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm relative z-40">
-        <div onClick={() => { setIsManagingPlan(false); navigate('/'); }} className="text-xl font-bold text-slate-900 tracking-tight cursor-pointer">
-          Habi<span className="text-emerald-600">tick.ie</span>
+      {/* TOAST SYSTEM */}
+      {toast.show && (
+        <div className={`fixed top-8 left-1/2 -translate-x-1/2 z-[10000] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-10 duration-300 font-medium ${toast.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}`}>
+          <span className="text-xl">{toast.type === 'error' ? '🛑' : '✨'}</span>{toast.message}
         </div>
-        
-        <div className="hidden sm:flex bg-slate-100 p-1 rounded-lg">
-          <button 
-            onClick={() => { setViewMode('client'); setIsManagingPlan(false); }}
-            className={`px-4 py-1.5 text-sm font-semibold rounded-md transition cursor-pointer ${viewMode === 'client' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            🙋‍♂️ Hire Services
-          </button>
-          <button 
-            onClick={() => { setViewMode('pro'); setIsManagingPlan(false); }}
-            className={`px-4 py-1.5 text-sm font-semibold rounded-md transition cursor-pointer ${viewMode === 'pro' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            💼 Offer Services
-          </button>
-        </div>
+      )}
 
-        <div className="flex items-center gap-4 relative">
-          {currentActivePlan === 'free' && (
-            <button onClick={() => setIsManagingPlan(true)} className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-3 py-2 rounded-lg hover:bg-emerald-200 transition cursor-pointer hidden sm:block">
-              🚀 Upgrade
-            </button>
-          )}
-          
-          <div onClick={() => setIsMenuOpen(!isMenuOpen)} className="w-10 h-10 bg-slate-900 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:bg-slate-800 transition">
-            JD
+      {/* NAVBAR DO DASHBOARD */}
+      <nav className="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div onClick={() => navigate('/')} className="text-2xl font-black text-slate-900 tracking-tight cursor-pointer hover:opacity-80 transition">
+            Habi<span className="text-emerald-600">tick.ie</span>
           </div>
-
-          {/* MENU SUSPENSO DROPDOWN */}
-          {isMenuOpen && (
-            <div className="absolute top-14 right-0 w-56 bg-white border border-slate-200 shadow-xl rounded-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-              <div className="px-4 py-3 border-b border-slate-100 mb-1 bg-slate-50 rounded-t-xl mt-[-8px]">
-                <p className="text-sm font-bold text-slate-900">John Doe</p>
-                <p className="text-xs text-slate-500">Balance: <strong className="text-emerald-600">€{userBalance}</strong></p>
-              </div>
-              <button onClick={() => handleMenuClick('profile')} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition cursor-pointer flex items-center gap-2"><span>👤</span> Profile Overview</button>
-              <button onClick={() => handleMenuClick('wallet')} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition cursor-pointer flex items-center gap-2"><span>💳</span> Wallet & Balance</button>
-              <button onClick={() => handleMenuClick('withdraw')} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition cursor-pointer flex items-center gap-2"><span>🏦</span> Withdraw Funds</button>
-              <button onClick={() => handleMenuClick('support')} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition cursor-pointer flex items-center gap-2"><span>🎧</span> Help & Support</button>
-              <div className="border-t border-slate-100 mt-1 pt-1">
-                <button onClick={() => handleMenuClick('logout')} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition cursor-pointer flex items-center gap-2"><span>🚪</span> Log Out</button>
-              </div>
+          
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-semibold text-slate-500 hidden sm:block bg-slate-100 px-3 py-1 rounded-full capitalize">
+              {role} Mode
+            </span>
+            <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center text-white font-bold shadow-md cursor-pointer hover:bg-emerald-700 transition active:scale-95">
+              {user?.email?.charAt(0).toUpperCase()}
             </div>
-          )}
+          </div>
         </div>
       </nav>
 
-      {isMenuOpen && <div onClick={() => setIsMenuOpen(false)} className="fixed inset-0 z-30"></div>}
-
-      <div className="p-6 sm:p-8 max-w-5xl mx-auto">
-        {/* TELA DE GERENCIAMENTO DE PLANOS */}
-        {isManagingPlan ? (
-          <div className="max-w-4xl mx-auto animate-in fade-in duration-300">
-            <button onClick={() => setIsManagingPlan(false)} className="text-sm font-bold text-slate-500 mb-4 hover:text-slate-800 cursor-pointer">← Back to Workspace</button>
-            <h1 className="text-3xl font-bold text-slate-900 mb-8 text-center border-b border-slate-100 pb-4">Choose your {viewMode === 'client' ? 'Client' : 'Pro'} Plan</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* PLANO FREE */}
-              <div className={`bg-white rounded-3xl p-8 border-2 shadow-sm ${currentActivePlan === 'free' ? 'border-slate-300' : 'border-transparent'}`}>
-                <h2 className="text-xl font-bold text-slate-900 mb-2">Free Plan</h2>
-                <div className="text-4xl font-black mb-6">€0 <span className="text-sm font-normal text-slate-400">/mo</span></div>
-                <ul className="space-y-4 mb-8 text-sm text-slate-600">
-                  {viewMode === 'client' ? (
-                    <><li>✔ Post job requests</li><li>✖ Fast-track matching</li></>
-                  ) : (
-                    <><li>✔ List your services</li><li>✖ Priority visibility</li></>
-                  )}
-                </ul>
-                {currentActivePlan === 'free' ? <div className="w-full text-center py-3 bg-slate-100 rounded-xl text-slate-500 font-bold">Current Plan</div> : <button onClick={downgradePlan} className="w-full py-3 border border-slate-200 rounded-xl font-bold hover:bg-slate-50">Switch to Free</button>}
-              </div>
-              {/* PLANO PRO */}
-              <div className={`bg-slate-900 rounded-3xl p-8 border-2 shadow-xl relative overflow-hidden ${currentActivePlan === 'pro' ? 'border-emerald-500' : 'border-transparent'}`}>
-                <h2 className="text-xl font-bold text-white mb-2">{viewMode === 'client' ? 'Premium Client' : 'Pro Member'}</h2>
-                <div className="text-4xl font-black text-white mb-6">€7 <span className="text-sm font-normal text-slate-500">/mo</span></div>
-                <ul className="space-y-4 mb-8 text-sm">
-                  {viewMode === 'client' ? (
-                    <><li className="text-emerald-400 font-bold">✔ Match with pros 3x faster</li><li className="text-slate-300">✔ Exclusive highest-rated workers</li></>
-                  ) : (
-                    <><li className="text-emerald-400 font-bold">✔ Priority Listing (Show first)</li><li className="text-slate-300">✔ Blue "Verified Pro" Badge</li></>
-                  )}
-                </ul>
-                {currentActivePlan === 'pro' ? <div className="w-full text-center py-3 bg-emerald-600/20 border border-emerald-500 rounded-xl text-emerald-400 font-bold">Current Plan</div> : <button onClick={upgradePlan} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-500 shadow-lg">Upgrade (€7)</button>}
-              </div>
+      <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row gap-8">
+        
+        {/* MENU LATERAL (Sidebar Estilo Airbnb) */}
+        <aside className="w-full md:w-64 flex-shrink-0">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sticky top-24">
+            <div className="mb-6 px-4 pt-2">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">My Account</p>
+              <p className="font-bold text-slate-900 truncate">{user?.email}</p>
             </div>
-          </div>
-        ) : (
-          /* WORKSPACES COMPACTOS */
-          <>
-            {viewMode === 'client' ? (
-              <div className="animate-in fade-in duration-300">
-                <div className="flex justify-between items-center mb-8">
-                  <div>
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2 flex items-center gap-3">My Bookings {clientPlan === 'pro' && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-bold">⭐ VIP Client</span>}</h1>
-                    <p className="text-slate-500">Manage your home service requests across Ireland.</p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button onClick={() => setIsManagingPlan(true)} className="text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-50 shadow-sm hidden sm:block">⚙️ Manage Plan</button>
-                    <button onClick={() => setIsNewBookingOpen(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-emerald-500">+ Book New Service</button>
-                  </div>
-                </div>
-                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-                  <h2 className="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Active Requests</h2>
-                  {activeRequests.length === 0 ? <div className="bg-slate-50 rounded-xl p-8 text-center border border-slate-100"><p className="text-slate-600 font-medium">No active bookings right now.</p></div> : (
-                    <div className="space-y-4">
-                      {activeRequests.map((req) => (
-                        <div key={req.id} className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex justify-between items-center">
-                          <div><h3 className="font-bold text-slate-900 text-lg">{req.service}</h3><p className="text-sm text-slate-500">📍 {req.location} • €{req.budget}</p><span className="inline-block mt-2 text-xs font-semibold bg-emerald-100 text-emerald-800 px-2 py-1 rounded-md">🔄 {req.status}</span></div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="animate-in fade-in duration-300">
-                <div className="flex justify-between items-center mb-8">
-                  <div>
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2 flex items-center gap-3">Pro Workspace {proPlan === 'pro' && <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full font-bold">🛡️ Verified Pro</span>}</h1>
-                    <p className="text-slate-500">Manage your tasks and track your Irish earnings.</p>
-                  </div>
-                  <button onClick={() => setIsManagingPlan(true)} className="text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-50 shadow-sm">⚙️ Manage Plan</button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm"><h2 className="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Jobs near you</h2><div className="bg-slate-50 rounded-xl p-6 text-center text-sm text-slate-500 italic">Waiting for new requests in your Eircode area...</div></div>
-                  <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm"><h2 className="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Earnings</h2><div className="text-4xl font-extrabold text-slate-900 mb-1">€{userBalance}</div><p className="text-xs text-slate-400">Withdrawals processed via SEPA (Irish Banks).</p></div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* =======================================================
-          MODAIS INTERATIVOS DAS OPÇÕES DO MENU DA DIREITA
-          ======================================================= */}
-
-      {/* 1. MODAL: PROFILE SETTINGS */}
-      {activeModal === 'profile' && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in-95 duration-150">
-            <button 
-              onClick={() => { setActiveModal(null); setIsEditingAddress(false); }} 
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer"
-            >
-              &times;
-            </button>
-            <h3 className="text-xl font-bold text-slate-900 mb-1">👤 Profile Overview</h3>
-            <p className="text-xs text-slate-500 mb-6">Your public Habitick identity.</p>
-
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md">JD</div>
-              <div>
-                <h4 className="font-bold text-slate-900 text-lg leading-tight">John Doe</h4>
-                <p className="text-sm text-slate-500">28 years old • {viewMode === 'pro' && proPlan === 'pro' ? 'Verified Pro' : (viewMode === 'pro' ? 'Independent Pro' : 'Client')}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Total Services</p>
-                <p className="text-2xl font-black text-slate-900">14</p>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Average Rating</p>
-                <p className="text-2xl font-black text-slate-900">4.9 <span className="text-sm">⭐</span></p>
-              </div>
-            </div>
-
-            <div className="border-t border-slate-100 pt-5">
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">Registered Eircode / Area</label>
-                {!isEditingAddress && (
-                  <button onClick={() => setIsEditingAddress(true)} className="text-xs font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer hover:underline">
-                    Edit
-                  </button>
-                )}
-              </div>
-              
-              {isEditingAddress ? (
-                <form 
-                  onSubmit={(e) => { e.preventDefault(); setIsEditingAddress(false); alert("Location updated successfully!"); }} 
-                  className="flex gap-2 animate-in fade-in duration-200"
-                >
-                  <input type="text" value={userAddress} onChange={(e) => setUserAddress(e.target.value)} className="w-full px-4 py-2 rounded-xl border border-emerald-300 bg-white text-sm focus:outline-emerald-600 shadow-sm" required />
-                  <button type="submit" className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-emerald-500 cursor-pointer">Save</button>
-                </form>
-              ) : (
-                <div className="bg-slate-50 px-4 py-3 rounded-xl border border-slate-100 text-sm font-medium text-slate-800">📍 {userAddress}</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 2. MODAL: WALLET & BALANCE */}
-      {activeModal === 'wallet' && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in-95 duration-150">
-            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer">&times;</button>
-            <h3 className="text-xl font-bold text-slate-900 mb-1">💳 Habitick Secure Wallet</h3>
-            <p className="text-xs text-slate-500 mb-6">Track your ongoing transactions and statement.</p>
-            <div className="bg-slate-900 text-white p-6 rounded-2xl text-center shadow-inner mb-6">
-              <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Available Balance</p>
-              <p className="text-5xl font-black mt-2 text-emerald-400">€{userBalance}</p>
-              <p className="text-[11px] text-slate-400 mt-2">All payments are secured via Stripe Escrow system.</p>
-            </div>
-            <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 text-xs text-slate-500">
-              <p className="font-bold text-slate-700 mb-2">Statement History</p>
-              <p className="italic">No transaction history found for this month.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. MODAL: WITHDRAW FUNDS (ATUALIZADO COM CARTÃO DE SALDO) */}
-      {activeModal === 'withdraw' && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in-95 duration-150">
-            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer">&times;</button>
-            <h3 className="text-xl font-bold text-slate-900 mb-1">🏦 Bank Payout (SEPA)</h3>
-            <p className="text-xs text-slate-500 mb-4">Transfer your earnings directly to your Irish bank account.</p>
             
-            {/* NOVO: CARTÃO DE SALDO DISPONÍVEL NO SAQUE */}
-            <div className="bg-slate-900 text-white p-4 rounded-xl flex justify-between items-center mb-6 shadow-inner">
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Available Balance</p>
-                <p className="text-2xl font-black text-emerald-400">€{userBalance}</p>
-              </div>
-              <span className="text-3xl opacity-80">💰</span>
+            <div className="space-y-1">
+              <button onClick={() => setActiveTab('overview')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition cursor-pointer active:scale-95 ${activeTab === 'overview' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+                <span className="text-lg">📊</span> Dashboard
+              </button>
+              <button onClick={() => setActiveTab('bookings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition cursor-pointer active:scale-95 ${activeTab === 'bookings' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+                <span className="text-lg">📅</span> {role === 'client' ? 'My Bookings' : 'My Jobs'}
+              </button>
+              <button onClick={() => setActiveTab('wallet')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition cursor-pointer active:scale-95 ${activeTab === 'wallet' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+                <span className="text-lg">💳</span> Wallet & Payouts
+              </button>
+              <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition cursor-pointer active:scale-95 ${activeTab === 'settings' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+                <span className="text-lg">⚙️</span> Settings
+              </button>
             </div>
 
-            <form onSubmit={(e) => { 
-              e.preventDefault(); 
-              const amount = parseFloat(e.target.withdrawAmount.value);
-              if(amount > parseFloat(userBalance)) {
-                alert("❌ Insufficient funds. You cannot withdraw more than your available balance.");
-                return;
-              }
-              setActiveModal(null); 
-              alert("Payout request received! Funds will arrive in 1-2 business days."); 
-            }} className="space-y-4">
-              <div className="bg-emerald-50 text-emerald-800 text-xs p-3 rounded-xl border border-emerald-100 flex items-center gap-2 font-medium">
-                <span>🔒</span> Habitick charges 0% commission on payouts.
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Amount to Withdraw (€)</label>
-                <input type="number" name="withdrawAmount" placeholder="Min. €5.00" min="5" step="0.01" max={userBalance} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-emerald-600" required />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Irish IBAN</label>
-                <input type="text" placeholder="IEAA AAAA BBBB CCCC DDDD EE" className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-emerald-600" required />
-              </div>
-              <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-500 transition cursor-pointer">Request Withdrawal</button>
-            </form>
+            <div className="mt-8 pt-4 border-t border-slate-100">
+              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition cursor-pointer active:scale-95">
+                <span className="text-lg">🚪</span> Log Out
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        </aside>
 
-      {/* 4. MODAL: HELP & SUPPORT */}
-      {activeModal === 'support' && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in-95 duration-150">
-            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer">&times;</button>
-            <h3 className="text-xl font-bold text-slate-900 mb-1">🎧 Local Customer Support</h3>
-            <p className="text-xs text-slate-500 mb-6">We are here to help you. Response time is usually under 1 hour.</p>
-            <div className="space-y-3 mb-6">
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
-                <div><p className="text-xs text-slate-500 font-bold uppercase">Official Support Email</p><p className="text-sm font-semibold text-slate-900">support@habitick.ie</p></div>
-                <a href="mailto:support@habitick.ie" className="text-xs font-bold text-emerald-600 hover:underline">Send Email</a>
+        {/* ÁREA DE CONTEÚDO PRINCIPAL */}
+        <main className="flex-grow">
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-8">
+            Good afternoon, {user?.email?.split('@')[0]} 👋
+          </h1>
+
+          {/* ================================================================
+              VISÃO DO CLIENTE (Foco em Conversão e Agendamento Estilo Uber)
+              ================================================================ */}
+          {role === 'client' && activeTab === 'overview' && (
+            <div className="space-y-6">
+              
+              {/* BANNER APELATIVO (Estilo Airbnb Premium) */}
+              <div className="bg-slate-900 rounded-3xl p-8 relative overflow-hidden shadow-xl shadow-slate-900/20">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+                <div className="relative z-10">
+                  <span className="bg-emerald-500 text-white text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-md">Habitick Premium</span>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white mt-4 mb-2">Need your home sorted today?</h2>
+                  <p className="text-slate-300 max-w-md text-sm mb-6 leading-relaxed">Book a top-rated professional now and skip the waiting list. Secure payments and guaranteed quality.</p>
+                  <button onClick={() => navigate('/')} className="bg-white text-slate-900 px-6 py-3 rounded-xl font-bold hover:bg-slate-100 transition active:scale-95 cursor-pointer shadow-lg">
+                    Explore Services →
+                  </button>
+                </div>
               </div>
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
-                <div><p className="text-xs text-slate-500 font-bold uppercase">Emergency Ticket</p><p className="text-sm font-semibold text-slate-900">Open a live dashboard dispute</p></div>
-                <button onClick={() => alert("Ticket opened. Our Limerick-based support will review your account status shortly.")} className="text-xs font-bold text-emerald-600 hover:underline cursor-pointer">Open Ticket</button>
+
+              {/* QUICK BOOK (Ícones rápidos estilo Uber) */}
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 mb-4 px-1">Quick Book</h3>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                  {[
+                    { icon: '🧹', name: 'Cleaning' },
+                    { icon: '🏡', name: 'Gardening' },
+                    { icon: '🚗', name: 'Car Wash' },
+                    { icon: '🔨', name: 'Handyman' },
+                    { icon: '➕', name: 'More' }
+                  ].map((item, idx) => (
+                    <div key={idx} onClick={() => navigate('/')} className="flex flex-col items-center gap-2 cursor-pointer group active:scale-95 transition-transform">
+                      <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-3xl group-hover:border-emerald-300 group-hover:shadow-md transition-all">
+                        {item.icon}
+                      </div>
+                      <span className="text-xs font-bold text-slate-600">{item.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* STATUS DO AGENDAMENTO ATUAL */}
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 mb-4 px-1">Active Bookings</h3>
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex items-center gap-6">
+                  <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-2xl border border-slate-100">
+                    📭
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-900">No active bookings right now.</p>
+                    <p className="text-sm text-slate-500 mt-1">When you book a service, you can track the Pro's arrival here.</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="text-[11px] text-center text-slate-400 bg-slate-50 p-2 rounded-lg">Operating hours: 8:00 AM to 10:00 PM (GMT) • Registered in Ireland</div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* MODAL DE NOVO SERVIÇO (SÓ PARA CLIENTES) */}
-      {isNewBookingOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative">
-            <button onClick={() => setIsNewBookingOpen(false)} className="absolute top-4 right-4 text-slate-400 font-bold text-xl cursor-pointer">&times;</button>
-            <h3 className="text-xl font-bold text-slate-900 mb-1">Post a Job</h3>
-            <form onSubmit={handlePostService} className="space-y-4">
-              <div><label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Service Type</label><select name="serviceType" className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-slate-50"><option>Home Cleaning</option><option>Gardening</option><option>Car Wash</option></select></div>
-              <div><label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Eircode / Location</label><input type="text" name="location" required placeholder="e.g. V94 XXXX" className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-slate-50" /></div>
-              <div><label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Hourly Offer</label><div className="relative"><span className="absolute left-4 top-2 text-slate-400 font-bold">€</span><input type="number" name="budget" required min="14.20" step="0.01" className="w-full pl-8 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50" /></div><p className="text-[11px] text-emerald-600 mt-1">🛡️ Minimum €14.20/hr required by law.</p></div>
-              <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-500 shadow-md cursor-pointer">Post Request</button>
-            </form>
-          </div>
-        </div>
-      )}
+          {/* ================================================================
+              VISÃO DO PROFISSIONAL (Foco em Ganhos e Trabalhos Disponíveis)
+              ================================================================ */}
+          {role === 'pro' && activeTab === 'overview' && (
+            <div className="space-y-6">
+              
+              {/* MÉTRICAS (Estilo Uber Driver) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Weekly Earnings</p>
+                  <p className="text-3xl font-black text-slate-900">€0.00</p>
+                </div>
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Jobs Completed</p>
+                  <p className="text-3xl font-black text-slate-900">0</p>
+                </div>
+                <div className="bg-slate-900 p-6 rounded-3xl shadow-md border border-slate-800 text-white flex flex-col justify-between relative overflow-hidden">
+                  <div className="absolute -right-4 -bottom-4 text-6xl opacity-20">⭐</div>
+                  <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1 relative z-10">Pro Rating</p>
+                  <p className="text-3xl font-black relative z-10">New</p>
+                </div>
+              </div>
+
+              {/* MURAL DE TRABALHOS (Job Board) */}
+              <div>
+                <div className="flex justify-between items-center mb-4 px-1">
+                  <h3 className="text-lg font-bold text-slate-900">Available Jobs Near You</h3>
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                    <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
+                    Looking for requests...
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 text-center flex flex-col items-center justify-center">
+                  <div className="text-4xl mb-4 opacity-50">📍</div>
+                  <h4 className="text-lg font-bold text-slate-900 mb-1">Your area is quiet right now</h4>
+                  <p className="text-sm text-slate-500 max-w-sm mx-auto mb-6">Make sure your profile is fully verified to receive premium job requests instantly.</p>
+                  <button onClick={() => showToast("Profile verification coming soon!", "success")} className="bg-emerald-50 text-emerald-700 px-6 py-2 rounded-xl font-bold text-sm hover:bg-emerald-100 transition active:scale-95 cursor-pointer">
+                    Verify Profile
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ESTADO VAZIO PARA OUTRAS ABAS */}
+          {activeTab !== 'overview' && (
+            <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-100 text-center animate-in fade-in duration-300">
+              <div className="text-5xl mb-4 opacity-20">🛠️</div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2 capitalize">{activeTab}</h3>
+              <p className="text-slate-500">This module is currently under development for the Habitick Beta.</p>
+            </div>
+          )}
+
+        </main>
+      </div>
     </div>
   );
 }
