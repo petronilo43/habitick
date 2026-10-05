@@ -7,6 +7,29 @@ accepts the job, does it, and marks it as done.
 It is a portfolio project. The services and prices are examples and no real bookings
 are fulfilled.
 
+## The idea
+
+Ordering a taxi or a takeaway takes a minute on a phone. Finding someone to cut the
+grass, clean the house or walk the dog still usually means asking around, ringing
+numbers and waiting for a call back. Habitick treats those everyday jobs like a ride:
+choose the service, say when and where, and the first available professional takes it.
+
+### How similar products work
+
+The same idea exists in other countries, and the products differ mainly in two things:
+how a job finds a professional, and who pays the platform.
+
+| Product | Where | How a job finds a pro | Who pays the platform |
+| --- | --- | --- | --- |
+| [TaskRabbit](https://www.taskrabbit.com) | US, UK and others | The client chooses a Tasker from a list | The client, as a service fee on top of the Tasker's rate |
+| [Airtasker](https://www.airtasker.com) | Australia, UK | The client posts a task, pros make offers, the client picks one | The pro, as a share of the task price that is smaller for pros on a higher tier |
+| [GetNinjas](https://www.getninjas.com.br) | Brazil | The client posts a request and a few pros pay to see the contact | The pro, who buys coins to unlock requests; there is no commission |
+| [Urban Company](https://www.urbancompany.com) | India, UAE, Singapore | The app matches the job to a vetted pro automatically | The pro, as a commission on each job |
+
+Habitick is closest to the last one: there is no bidding and no browsing of profiles,
+the job simply goes to the first pro who accepts it. What it adds is the privacy rule
+described below, where a pro sees only the area until they commit to the job.
+
 ## What it does
 
 **As a client**
@@ -174,10 +197,25 @@ src/
 tests/                   the automated tests
 ```
 
-## Not built yet
+## Ideas for what comes next
 
-- Payments. The "Premium" screen shows a price, but nothing is charged.
-- Email or push notifications when a booking changes; the lists refresh when the
-  window gets focus and with the Refresh button.
-- Reviews and ratings.
-- Matching by distance. Every pro sees every open request.
+Roughly in the order they would add the most:
+
+- **Reviews.** After a job is done the client rates the pro, and the rating is shown
+  when a pro accepts a booking. Every product in the table above depends on this for trust.
+- **Exact prices and payment.** Today a service has a "from" price. Each option would
+  get its own price, so a booking has a total, and the client would pay it through
+  Stripe in test mode (no real money) once a pro accepts.
+- **A Pro plan with real benefits.** The "Premium" screen shows a price, but nothing
+  is charged and nothing changes. A paid plan for pros could mean seeing new requests
+  a few minutes before everyone else, holding more jobs at once, and a badge the
+  client sees.
+- **Demo accounts.** One button to look around as a client and one as a pro, so a
+  visitor does not have to register.
+- **Services and areas for each pro.** A pro would choose what they offer and where,
+  and see only the requests that match. Today every pro sees every open request.
+- **Live updates and emails.** The lists refresh when the window gets focus and with
+  the Refresh button; they could update the moment something changes, with an email
+  when a booking is accepted.
+- **Offers.** Let several pros answer a request with a price and let the client choose,
+  the way Airtasker works, as an alternative to "first to accept".
