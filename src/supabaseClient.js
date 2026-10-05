@@ -1,7 +1,14 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
-// Substitua pelas chaves REAIS que você vai pegar no painel do seu Supabase grátis
-const supabaseUrl = 'https://jjkfzsjzfhlphhoxyerr.supabase.co';
-const supabaseAnonKey = 'sb_publishable_gikoDcsfDydhOUBJHp4zkA_xeRiC8mj';
+// The address of the Supabase project and its publishable key. Both are found in the
+// Supabase dashboard, in the project's API settings, and both are meant to be public:
+// what protects the data is the rules in supabase/schema.sql, not this key.
+//
+// Locally they are read from the file .env.local (see .env.example).
+// On Vercel they are set under Settings > Environment Variables.
+const url = import.meta.env.VITE_SUPABASE_URL
+const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const isConfigured = Boolean(url && key)
+
+export const supabase = isConfigured ? createClient(url, key) : null
