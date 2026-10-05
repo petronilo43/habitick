@@ -1,10 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Route, Routes, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { AppContext } from './context/app-context'
+import { getProPlan } from './lib/api'
 import AuthModal from './components/AuthModal'
 import Home from './pages/Home'
-import Dashboard from './pages/Dashboard'
+
+// The home page is part of the first download. The other pages are fetched the first
+// time someone opens them, so a visitor does not wait for code they may never use.
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Privacy = lazy(() => import('./pages/Privacy'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const NotFound = lazy(() => import('./pages/NotFound'))
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -12,17 +19,30 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 // the opening animation, the "curtain" shown while something is being saved, and the
 // login window. Pages reach these through useApp() (see context/app-context.js).
 export default function App() {
+  const navigate = useNavigate()
+
   // ---- 1. Who is logged in --------------------------------------------------
   // undefined = still checking, null = nobody, otherwise the Supabase session.
   const [session, setSession] = useState(undefined)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession))
+    const { data } = supabase.auth.onAuthStateChange((event, newSession) => {
+      setSession(newSession)
+      // Someone followed the link in a "forgot my password" email.
+      if (event === 'PASSWORD_RECOVERY') navigate('/reset-password')
+    })
     return () => data.subscription.unsubscribe()
+  }, [navigate])
+
+  // ---- 2. The Pro plan's numbers, read once from the database ------------------
+  const [plan, setPlan] = useState(null)
+
+  useEffect(() => {
+    getProPlan().then(setPlan, () => {}) // pages cope without it; they show the plan once it is here
   }, [])
 
-  // ---- 2. Toast messages ----------------------------------------------------
+  // ---- 3. Toast messages ----------------------------------------------------
   const [toast, setToast] = useState(null)
 
   const showToast = useCallback((message, type = 'success') => {
@@ -31,11 +51,11 @@ export default function App() {
 
   useEffect(() => {
     if (!toast) return
-    const timer = setTimeout(() => setToast(null), 4000)
+    const timer = setTimeout(() => setToast(null), 4500)
     return () => clearTimeout(timer)
   }, [toast])
 
-  // ---- 3. Opening animation, once per visit -----------------------------------
+  // ---- 4. Opening animation, once per visit -----------------------------------
   const [showIntro, setShowIntro] = useState(() => !sessionStorage.getItem('habitickIntroSeen'))
   const [introStep, setIntroStep] = useState(0)
 
@@ -53,7 +73,7 @@ export default function App() {
     return () => timers.forEach(clearTimeout)
   }, [showIntro])
 
-  // ---- 4. The curtain -----------------------------------------------------------
+  // ---- 5. The curtain -----------------------------------------------------------
   // Covers the screen while `action` runs. If the action returns true, the curtain
   // shows `successMessage` for a moment before lifting.
   const [curtain, setCurtain] = useState(null) // null, or the text to show
@@ -70,8 +90,8 @@ export default function App() {
     return succeeded
   }, [])
 
-  // ---- 5. The login / register window ---------------------------------------------
-  // null when closed, otherwise { mode: 'login' | 'register' | 'pricing', role: 'client' | 'pro' }.
+  // ---- 6. The login / register window ---------------------------------------------
+  // null when closed, otherwise { mode: 'login' | 'register' | 'forgot' | 'pro', role: 'client' | 'pro' }.
   const [auth, setAuth] = useState(null)
 
   const openAuth = useCallback((mode, role = 'client') => {
@@ -79,8 +99,8 @@ export default function App() {
   }, [])
 
   const app = useMemo(
-    () => ({ session, showToast, withCurtain, openAuth }),
-    [session, showToast, withCurtain, openAuth],
+    () => ({ session, plan, showToast, withCurtain, openAuth }),
+    [session, plan, showToast, withCurtain, openAuth],
   )
 
   return (
@@ -92,7 +112,7 @@ export default function App() {
             role="status"
             className={`fixed top-8 left-1/2 -translate-x-1/2 z-[10000] w-max max-w-[calc(100vw-2rem)] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-10 duration-300 font-medium ${toast.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}`}
           >
-            <span className="text-xl">{toast.type === 'error' ? '🛑' : '✨'}</span>
+            <span className="text-xl" aria-hidden="true">{toast.type === 'error' ? '🛑' : '✨'}</span>
             {toast.message}
           </div>
         )}
@@ -127,11 +147,16 @@ export default function App() {
           </div>
         )}
 
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="*" element={<Home />} />
-        </Routes>
+        {/* Suspense shows nothing for the instant a page's code is still arriving. */}
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
 
         {auth && <AuthModal auth={auth} setAuth={setAuth} />}
       </div>

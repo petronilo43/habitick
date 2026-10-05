@@ -1,22 +1,34 @@
 import { useState } from 'react'
-import { formatDate } from '../lib/format'
+import { paymentsEnabled } from '../lib/api'
+import { STATUS } from '../lib/booking'
+import { formatDate, formatMoney, formatRating } from '../lib/format'
+import Stars from './Stars'
 import StatusBadge from './StatusBadge'
+import { smallDanger, smallGreen, smallQuiet } from './ui'
 
-const quiet = 'text-sm font-bold px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
-const strong = 'text-sm font-bold px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 transition active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
-const danger = 'text-sm font-bold px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-500 transition active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
+// In the demo there is nobody on the other side, so the guest can play that person's
+// next step. This says which step, if any, is next for this booking.
+function demoStep(booking, viewer) {
+  if (viewer === 'client' && booking.status === STATUS.REQUESTED) return 'Demo: let Seán accept this'
+  if (viewer === 'client' && booking.status === STATUS.ACCEPTED) return 'Demo: let Seán finish the job'
+  if (viewer === 'pro' && booking.isDone && !booking.isPaid) return 'Demo: let Aoife pay and review'
+  return null
+}
 
 // One booking in a list. `viewer` is 'client' or 'pro' and decides what is shown:
 // the client sees who is coming, the pro sees where to go and for whom.
 // Which buttons appear is decided by the rules on the Booking itself (lib/booking.js).
-export default function BookingCard({ booking, viewer, userId, busy, onCancel, onRelease, onComplete }) {
+export default function BookingCard({ booking, viewer, userId, busy, inDemo, onCancel, onRelease, onComplete, onPay, onReview, onDemoStep }) {
   // Cancelling and giving a job back ask "are you sure?" first.
   const [confirming, setConfirming] = useState(null) // null, 'cancel' or 'release'
 
   const canCancel = viewer === 'client' && booking.canBeCancelledBy(userId)
+  const canPay = viewer === 'client' && paymentsEnabled && booking.canBePaidBy(userId)
+  const canReview = viewer === 'client' && booking.canBeReviewedBy(userId)
   const canRelease = viewer === 'pro' && booking.canBeReleasedBy(userId)
   const canComplete = viewer === 'pro' && booking.canBeCompletedBy(userId)
   const waitingForDay = canRelease && !canComplete
+  const nextDemoStep = inDemo ? demoStep(booking, viewer) : null
 
   return (
     <article className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-100">
@@ -25,53 +37,84 @@ export default function BookingCard({ booking, viewer, userId, busy, onCancel, o
           {booking.serviceIcon}
         </div>
         <div className="flex-grow min-w-0">
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
             <h4 className="font-bold text-slate-900">{booking.serviceName}</h4>
             <StatusBadge booking={booking} />
           </div>
           <p className="text-sm text-slate-600 mt-0.5">{booking.option}</p>
 
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-slate-400 font-medium">When</dt>
+          <dl className="mt-3 grid grid-cols-[3.25rem_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt className="text-slate-500 font-medium">When</dt>
             <dd className="text-slate-700 font-semibold">{formatDate(booking.date)}</dd>
-            <dt className="text-slate-400 font-medium">Where</dt>
+            <dt className="text-slate-500 font-medium">Where</dt>
             <dd className="text-slate-700 font-semibold">{booking.eircode}</dd>
+            <dt className="text-slate-500 font-medium">Price</dt>
+            <dd className="text-slate-700 font-semibold">{formatMoney(booking.totalCents)}</dd>
             {viewer === 'client' && booking.proName && (
               <>
-                <dt className="text-slate-400 font-medium">Pro</dt>
-                <dd className="text-slate-700 font-semibold">{booking.proName}</dd>
+                <dt className="text-slate-500 font-medium">Pro</dt>
+                <dd className="text-slate-700 font-semibold flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  {booking.proName}
+                  {booking.proIsMember && (
+                    <span className="text-[10px] font-black tracking-wider bg-slate-900 text-emerald-400 px-1.5 py-0.5 rounded" title="Habitick Pro member">
+                      PRO
+                    </span>
+                  )}
+                  <span className="text-xs font-medium text-slate-500">
+                    <span className="text-amber-500" aria-hidden="true">★</span> {formatRating(booking.proRating, booking.proReviews)}
+                  </span>
+                </dd>
               </>
             )}
             {viewer === 'pro' && (
               <>
-                <dt className="text-slate-400 font-medium">Client</dt>
+                <dt className="text-slate-500 font-medium">Client</dt>
                 <dd className="text-slate-700 font-semibold">{booking.clientName}</dd>
               </>
             )}
             {booking.details && (
               <>
-                <dt className="text-slate-400 font-medium">Notes</dt>
+                <dt className="text-slate-500 font-medium">Notes</dt>
                 <dd className="text-slate-700 break-words">{booking.details}</dd>
+              </>
+            )}
+            {booking.review && (
+              <>
+                <dt className="text-slate-500 font-medium">Review</dt>
+                <dd className="text-slate-700 break-words">
+                  <Stars rating={booking.review.rating} />
+                  {booking.review.comment && <span className="block mt-0.5">“{booking.review.comment}”</span>}
+                </dd>
               </>
             )}
           </dl>
 
-          {(canCancel || canRelease || canComplete) && (
+          {(canCancel || canPay || canReview || canRelease || canComplete) && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {confirming === null && (
                 <>
                   {canComplete && (
-                    <button className={strong} disabled={busy} onClick={() => onComplete(booking)}>
+                    <button className={smallGreen} disabled={busy} onClick={() => onComplete(booking)}>
                       Mark as done
                     </button>
                   )}
+                  {canPay && (
+                    <button className={smallGreen} disabled={busy} onClick={() => onPay(booking)}>
+                      Pay {formatMoney(booking.totalCents)}
+                    </button>
+                  )}
+                  {canReview && (
+                    <button className={smallQuiet} disabled={busy} onClick={() => onReview(booking)}>
+                      Leave a review
+                    </button>
+                  )}
                   {canRelease && (
-                    <button className={quiet} disabled={busy} onClick={() => setConfirming('release')}>
+                    <button className={smallQuiet} disabled={busy} onClick={() => setConfirming('release')}>
                       Give job back
                     </button>
                   )}
                   {canCancel && (
-                    <button className={quiet} disabled={busy} onClick={() => setConfirming('cancel')}>
+                    <button className={smallQuiet} disabled={busy} onClick={() => setConfirming('cancel')}>
                       Cancel booking
                     </button>
                   )}
@@ -85,7 +128,7 @@ export default function BookingCard({ booking, viewer, userId, busy, onCancel, o
                     {confirming === 'cancel' ? 'Cancel this booking?' : 'Give this job back to other pros?'}
                   </span>
                   <button
-                    className={danger}
+                    className={smallDanger}
                     disabled={busy}
                     onClick={() => {
                       setConfirming(null)
@@ -95,12 +138,22 @@ export default function BookingCard({ booking, viewer, userId, busy, onCancel, o
                   >
                     {confirming === 'cancel' ? 'Yes, cancel it' : 'Yes, give it back'}
                   </button>
-                  <button className={quiet} onClick={() => setConfirming(null)}>
+                  <button className={smallQuiet} onClick={() => setConfirming(null)}>
                     No, keep it
                   </button>
                 </>
               )}
             </div>
+          )}
+
+          {nextDemoStep && (
+            <button
+              disabled={busy}
+              onClick={() => onDemoStep(booking)}
+              className="mt-3 text-xs font-bold text-slate-600 border border-dashed border-slate-300 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+            >
+              ▶ {nextDemoStep}
+            </button>
           )}
         </div>
       </div>

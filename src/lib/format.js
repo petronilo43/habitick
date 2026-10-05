@@ -2,10 +2,15 @@
 
 const euro = new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' })
 
-// 1450, 'hour' -> "From €14.50/hr"      2900, 'fixed' -> "From €29.00 fixed"
-export function formatPrice(cents, unit) {
-  const amount = euro.format(cents / 100)
-  return unit === 'hour' ? `From ${amount}/hr` : `From ${amount} fixed`
+// 4350 -> "€43.50"
+export function formatMoney(cents) {
+  return euro.format(cents / 100)
+}
+
+// 0.5 -> "30 minutes"   1 -> "1 hour"   1.5 -> "1.5 hours"
+export function formatHours(hours) {
+  if (hours < 1) return `${Math.round(hours * 60)} minutes`
+  return hours === 1 ? '1 hour' : `${hours} hours`
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -16,6 +21,19 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export function formatDate(isoDate) {
   const date = new Date(`${isoDate}T00:00:00Z`)
   return `${DAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`
+}
+
+// A moment in time -> "12 Oct 2026", in Irish time.
+export function formatDay(timestamp) {
+  return new Intl.DateTimeFormat('en-IE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Dublin' }).format(
+    new Date(timestamp),
+  )
+}
+
+// 4.5, 12 -> "4.5 (12 reviews)"      null, 0 -> "No reviews yet"
+export function formatRating(rating, reviews) {
+  if (!reviews) return 'No reviews yet'
+  return `${Number(rating).toFixed(1)} (${reviews} ${reviews === 1 ? 'review' : 'reviews'})`
 }
 
 // "Thiago Petronilo" -> "Thiago"

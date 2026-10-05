@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApp } from '../context/app-context'
-import { acceptBooking, completeBooking, listMyJobs, listOpenJobs, releaseBooking } from '../lib/api'
+import { useLiveReload } from '../hooks/useLiveReload'
+import { acceptBooking, completeBooking, demoAdvance, getLockedJobs, listMyJobs, listOpenJobs, paymentsEnabled, releaseBooking } from '../lib/api'
 import { STATUS } from '../lib/booking'
-import { formatDate, formatPrice } from '../lib/format'
+import { formatDate, formatMoney } from '../lib/format'
+import { Membership } from '../lib/plan'
 import BookingCard from './BookingCard'
 import { Empty, Failed, Loading } from './ListState'
+import { smallGreen, smallQuiet } from './ui'
 
 // One request that no pro has taken yet. It shows the area, never the full address.
 function OpenJob({ job, busy, onAccept }) {
@@ -16,40 +19,55 @@ function OpenJob({ job, busy, onAccept }) {
       <div className="flex-grow min-w-0">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3">
           <h4 className="font-bold text-slate-900">{job.service_name}</h4>
-          <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">{formatPrice(job.price_cents, job.price_unit)}</span>
+          <span className="text-lg font-black text-slate-900">{formatMoney(job.total_cents)}</span>
         </div>
         <p className="text-sm text-slate-600 mt-0.5">{job.option}</p>
         <p className="text-sm text-slate-700 font-semibold mt-2">
           {formatDate(job.scheduled_date)} <span className="text-slate-300 mx-1">|</span> {job.area} area
         </p>
         {job.details && <p className="text-sm text-slate-600 mt-2 break-words">“{job.details}”</p>}
-        <button
-          disabled={busy}
-          onClick={() => onAccept(job)}
-          className="mt-4 text-sm font-bold px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 transition active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Accept job
-        </button>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button disabled={busy} onClick={() => onAccept(job)} className={smallGreen}>
+            Accept job
+          </button>
+          {job.early_access && (
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">Pro early access</span>
+          )}
+        </div>
       </div>
     </article>
   )
 }
 
+function Stat({ label, value, note, dark = false }) {
+  return (
+    <div className={`p-5 rounded-3xl shadow-sm border ${dark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100'}`}>
+      <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${dark ? 'text-emerald-400' : 'text-slate-500'}`}>{label}</p>
+      <p className="text-3xl font-black">{value}</p>
+      <p className={`text-xs font-semibold mt-2 ${dark ? 'text-slate-300' : 'text-slate-500'}`}>{note}</p>
+    </div>
+  )
+}
+
 // The dashboard for someone who provides services.
 // `tab` is 'overview' (numbers and open requests) or 'bookings' (the jobs they took).
-export default function ProPanel({ userId, tab }) {
-  const { showToast } = useApp()
+export default function ProPanel({ userId, tab, profile, inDemo, onOpenPlan }) {
+  const { showToast, plan } = useApp()
 
-  const [data, setData] = useState({ status: 'loading', openJobs: [], myJobs: [], error: '' })
+  // `locked` is how many requests are still in Pro early access, and in how many minutes the next one opens.
+  const [data, setData] = useState({ status: 'loading', openJobs: [], locked: { jobs: 0, minutes: 0 }, myJobs: [], error: '' })
   const [reloads, setReloads] = useState(0)
   const [busy, setBusy] = useState(false)
-  const reload = () => setReloads((n) => n + 1)
+  const reload = useCallback(() => setReloads((n) => n + 1), [])
 
   useEffect(() => {
     let active = true
-    Promise.all([listOpenJobs(), listMyJobs(userId)]).then(
-      ([openJobs, myJobs]) => {
-        if (active) setData({ status: 'ready', openJobs, myJobs, error: '' })
+    Promise.all([listOpenJobs(), getLockedJobs(), listMyJobs(userId)]).then(
+      ([openJobs, lockedJobs, myJobs]) => {
+        if (!active) return
+        const wait = lockedJobs.next_opens_at ? new Date(lockedJobs.next_opens_at) - Date.now() : 0
+        const locked = { jobs: lockedJobs.jobs, minutes: Math.max(1, Math.ceil(wait / 60_000)) }
+        setData({ status: 'ready', openJobs, locked, myJobs, error: '' })
       },
       (problem) => {
         if (active) setData((old) => ({ ...old, status: 'error', error: problem.message }))
@@ -58,12 +76,9 @@ export default function ProPanel({ userId, tab }) {
     return () => {
       active = false
     }
-  }, [userId, reloads, tab]) // moving between tabs also loads fresh data
+  }, [userId, reloads, tab, profile?.pro_until]) // also when the Pro plan starts: early-access requests appear
 
-  useEffect(() => {
-    window.addEventListener('focus', reload)
-    return () => window.removeEventListener('focus', reload)
-  }, [])
+  useLiveReload(reload)
 
   // Runs one action, says what happened, and loads the lists again either way:
   // if the action failed (say, another pro was quicker), the lists are out of date.
@@ -82,14 +97,32 @@ export default function ProPanel({ userId, tab }) {
   const handleAccept = (job) => run(() => acceptBooking(job.id), 'Job accepted. The address is now in My Jobs.')
   const handleRelease = (booking) => run(() => releaseBooking(booking.id), 'Job given back.')
   const handleComplete = (booking) => run(() => completeBooking(booking.id), 'Nice work! Job marked as done.')
+  const handleDemoStep = (booking) => run(() => demoAdvance(booking.id), 'Demo: Aoife paid and left a review.')
 
   const toDo = data.myJobs.filter((job) => job.status === STATUS.ACCEPTED)
   const done = data.myJobs.filter((job) => job.status === STATUS.COMPLETED)
   const cancelled = data.myJobs.filter((job) => job.status === STATUS.CANCELLED)
 
+  // The numbers at the top are all worked out from the pro's real jobs.
+  const reviews = done.filter((job) => job.review).map((job) => job.review.rating)
+  const rating = reviews.length ? (reviews.reduce((sum, stars) => sum + stars, 0) / reviews.length).toFixed(1) : '–'
+  // With payments switched on, only jobs the client has paid count as earned.
+  const earned = done.filter((job) => job.isPaid || !paymentsEnabled).reduce((sum, job) => sum + job.totalCents, 0)
+  const membership = plan ? new Membership(profile, plan) : null
+
   const cards = (jobs) =>
     jobs.map((job) => (
-      <BookingCard key={job.id} booking={job} viewer="pro" userId={userId} busy={busy} onRelease={handleRelease} onComplete={handleComplete} />
+      <BookingCard
+        key={job.id}
+        booking={job}
+        viewer="pro"
+        userId={userId}
+        busy={busy}
+        inDemo={inDemo}
+        onRelease={handleRelease}
+        onComplete={handleComplete}
+        onDemoStep={handleDemoStep}
+      />
     ))
 
   const state = (
@@ -132,24 +165,11 @@ export default function ProPanel({ userId, tab }) {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      {/* NUMBERS, counted from the real bookings */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Open Requests</p>
-          <p className="text-3xl font-black text-slate-900">{data.openJobs.length}</p>
-          <p className="text-xs text-emerald-600 font-bold mt-2">Waiting for a pro</p>
-        </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Jobs To Do</p>
-          <p className="text-3xl font-black text-slate-900">{toDo.length}</p>
-          <p className="text-xs text-slate-500 font-semibold mt-2">Accepted by you</p>
-        </div>
-        <div className="bg-slate-900 p-6 rounded-3xl shadow-md border border-slate-800 text-white relative overflow-hidden">
-          <div className="absolute -right-4 -bottom-4 text-6xl opacity-20" aria-hidden="true">⭐</div>
-          <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1 relative z-10">Jobs Completed</p>
-          <p className="text-3xl font-black relative z-10">{done.length}</p>
-          <p className="text-xs text-slate-300 font-semibold mt-2 relative z-10">{done.length === 0 ? 'Ready for your first one!' : 'Keep it up!'}</p>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Stat label="Jobs To Do" value={toDo.length} note={membership ? `Up to ${membership.activeJobLimit} at once` : 'Accepted by you'} />
+        <Stat label="Jobs Completed" value={done.length} note={done.length === 0 ? 'Ready for your first one!' : 'Keep it up!'} />
+        <Stat label="Your Rating" value={rating} note={reviews.length === 1 ? 'From 1 review' : `From ${reviews.length} reviews`} />
+        <Stat label="Earned" value={formatMoney(earned)} note={paymentsEnabled ? 'From jobs clients have paid' : 'From the jobs you completed'} dark />
       </div>
 
       {/* OPEN REQUESTS */}
@@ -161,10 +181,28 @@ export default function ProPanel({ userId, tab }) {
           </button>
         </div>
         <div className="space-y-4">
+          {/* On the free plan, brand-new requests wait a few minutes. Say so, rather than hide it. */}
+          {data.locked.jobs > 0 && (
+            <div className="bg-slate-900 text-white rounded-3xl p-5 sm:p-6 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="font-bold">
+                  <span aria-hidden="true">🔒</span>{' '}
+                  {data.locked.jobs === 1 ? '1 new request is' : `${data.locked.jobs} new requests are`} in Pro early access
+                </p>
+                <p className="text-sm text-slate-300 mt-1">
+                  Pro members can take {data.locked.jobs === 1 ? 'it' : 'them'} now. {data.locked.jobs === 1 ? 'It opens' : 'The next one opens'} to everyone in about{' '}
+                  {data.locked.minutes} {data.locked.minutes === 1 ? 'minute' : 'minutes'}.
+                </p>
+              </div>
+              <button onClick={onOpenPlan} className={`${smallQuiet} bg-white`}>
+                See the Pro plan
+              </button>
+            </div>
+          )}
           {state}
           {data.status === 'ready' && data.openJobs.length === 0 && (
             <Empty icon="📍" title="No open requests at the moment.">
-              When a client books a service, it appears here for you to accept.
+              When a client books a service you offer, in an area you cover, it appears here for you to accept.
             </Empty>
           )}
           {data.openJobs.map((job) => (

@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Browser tests: their builds of the site and what they leave behind
+dist-e2e
+dist-e2e-nopay
+test-results
+playwright-report
+
 # Local settings. .env.example shows what goes in them.
 .env
 
